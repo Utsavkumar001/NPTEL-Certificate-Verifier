@@ -35,7 +35,10 @@ def startup():
 
 @app.get("/")
 def root(request: Request):
-    return templates.TemplateResponse("landing.html", {"request": request})
+    return templates.TemplateResponse(
+        request=request,
+        name="landing.html"
+    )
 
 
 @app.get("/health")
@@ -46,8 +49,9 @@ def health():
 @app.exception_handler(500)
 async def internal_error_handler(request: Request, exc: Exception):
     return templates.TemplateResponse(
-        "error.html",
-        {"request": request, "message": "Something went wrong. Please try again."},
+        request=request,
+        name="error.html",
+        context={"message": "Something went wrong. Please try again."},
         status_code=500,
     )
 
@@ -55,7 +59,8 @@ async def internal_error_handler(request: Request, exc: Exception):
 @app.exception_handler(404)
 async def not_found_handler(request: Request, exc: Exception):
     return templates.TemplateResponse(
-        "error.html",
-        {"request": request, "message": "Page not found."},
+        request=request,
+        name="error.html",
+        context={"message": "Page not found."},
         status_code=404,
     )
