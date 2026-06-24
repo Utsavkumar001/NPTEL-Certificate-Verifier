@@ -1,21 +1,17 @@
 """
 QR code extraction from NPTEL certificate PDFs.
-
 NPTEL certificates embed the QR as a raster image inside the PDF page
 content, not as a separate extractable image object in a clean way
 (confirmed while inspecting a real sample certificate - pdfimages alone
 did not reliably isolate it). The robust approach is to rasterize the
 full page to an image and scan it for QR codes.
-
 Uses PyMuPDF (fitz) to rasterize, NOT the poppler `pdftoppm` command-line
 tool -- that requires a separate system install + PATH setup (Linux-only
 by default, painful on Windows). PyMuPDF is a pure pip package, so this
 works identically on Windows/Mac/Linux with zero extra setup.
 """
-
 import io
 from typing import Optional
-
 import fitz  # PyMuPDF
 from pyzbar.pyzbar import decode
 from PIL import Image
@@ -37,15 +33,26 @@ def extract_qr_url(pdf_path: str, dpi: int = 200) -> str:
         raise QRExtractionError(f"Failed to open PDF for QR scanning: {e}")
 
     if doc.page_count < 1:
+        doc.close()
         raise QRExtractionError("PDF has no pages.")
 
     page = doc[0]
     zoom = dpi / 72  # PDF default is 72 dpi
     pix = page.get_pixmap(matrix=fitz.Matrix(zoom, zoom))
-    img = Image.open(io.BytesIO(pix.tobytes("png")))
+
+    # Convert to bytes first, then explicitly delete pixmap
+    # Kya kiya: pix object ko bytes mein convert karne ke baad turant delete kiya
+    # Kya hoga: ~108MB PyMuPDF pixmap RAM immediately free ho jaayega — 
+    #           Python GC ka wait nahi karega, pdfplumber ke chalte waqt 
+    #           ye memory available rahegi
+    img_bytes = pix.tobytes("png")
+    del pix
     doc.close()
 
+    img = Image.open(io.BytesIO(img_bytes))
     decoded = decode(img)
+    del img        # free PIL image memory
+    del img_bytes  # free raw bytes
 
     if not decoded:
         raise QRExtractionError(
