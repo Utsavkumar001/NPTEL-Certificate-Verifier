@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block title %}My Dashboard{% endblock %}
+{% block logout_url %}/student/logout{% endblock %}
+
+{% block body %}
+<div class="container">
+
+  {% if success %}<div class="alert alert-success">{{ success }}</div>{% endif %}
+  {% if error   %}<div class="alert alert-error">{{ error }}</div>{% endif %}
+
+  <div style="display:grid; grid-template-columns:1fr auto; gap:1rem; align-items:start; margin-bottom:1.5rem;">
+    <div>
+      <div class="page-title" style="margin-bottom:.25rem;">Welcome, {{ student.name }}</div>
+      <div style="font-size:.875rem; color:#64748b;">
+        {{ student.roll }} &nbsp;·&nbsp; {{ student["class"] }} &nbsp;·&nbsp;
+        Semester {{ student.semester }} &nbsp;·&nbsp; {{ student.department }}
+      </div>
+    </div>
+    <div class="card" style="margin:0; padding:1rem 1.5rem; text-align:center; min-width:140px;">
+      <div style="font-size:.75rem; color:#64748b; font-weight:600; text-transform:uppercase; letter-spacing:.5px;">Credits Earned</div>
+      <div style="font-size:2rem; font-weight:700; color:#3b82f6; line-height:1.2;">{{ total_credits }}</div>
+    </div>
+  </div>
+
+  <!-- Profile Card -->
+  <div class="card">
+    <div class="card-title">Your Profile</div>
+    <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:.75rem; font-size:.875rem; margin-bottom:1rem;">
+      <div><span style="color:#64748b;">Roll No</span><br/><strong>{{ student.roll }}</strong></div>
+      <div><span style="color:#64748b;">Class</span><br/><strong>{{ student["class"] }}</strong></div>
+      <div><span style="color:#64748b;">Semester</span><br/><strong>{{ student.semester }}</strong></div>
+      <div><span style="color:#64748b;">School</span><br/><strong>{{ student.school }}</strong></div>
+      <div><span style="color:#64748b;">Department</span><br/><strong>{{ student.department }}</strong></div>
+    </div>
+    <form method="post" action="/student/edit-profile" style="display:flex; gap:.75rem; align-items:flex-end;">
+      <div class="form-group" style="margin:0;">
+        <label>Update Semester</label>
+        <select name="semester" style="min-width:160px;">
+          {% for s in range(1,9) %}
+            <option value="{{ s }}" {% if student.semester == s|string %}selected{% endif %}>Semester {{ s }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button type="submit" class="btn btn-outline btn-sm" style="align-self:flex-end;">Update</button>
+    </form>
+  </div>
+  
+  {% if requests_open %}
+  <div class="card">
+    <div class="card-title">Request a New Course</div>
+    <form method="post" action="/student/request-course">
+      <div class="form-row">
+        <div class="form-group">
+          <label>NPTEL Course Name</label>
+          <input type="text" name="course_name" required placeholder="e.g. Deep Learning for NLP"/>
+        </div>
+        <div class="form-group">
+          <label>NPTEL Course ID</label>
+          <input type="text" name="nptel_course_id" required placeholder="e.g. NOC26CS33"/>
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary">Submit Request</button>
+    </form>
+
+  </div>
+  {% else %}
+  <div class="alert alert-info" style="margin-bottom:1.5rem;">
+    🔒 Course requests are currently closed. Please contact your faculty to open the request window.
+  </div>
+  {% endif %}
+
+  {% if courses %}
+  <div class="card-title" style="margin-bottom:.75rem;">My Courses</div>
+  <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:1rem;">
+    {% for item in courses %}
+    {% set req = item.req %}
+    {% set cert = item.cert %}
+    <div class="card" style="margin:0;">
+
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:.75rem;">
+        <div>
+          <div style="font-weight:600; font-size:.9375rem;">{{ req.course_name }}</div>
+          <div style="font-size:.8125rem; color:#64748b; margin-top:.2rem;">{{ req.nptel_course_id }}</div>
+        </div>
+        {% if req.status == "pending" %}<span class="badge badge-pending">Pending</span>
+        {% elif req.status == "approved" %}<span class="badge badge-approved">Approved</span>
+        {% elif req.status == "rejected" %}<span class="badge badge-rejected">Rejected</span>
+        {% endif %}
+      </div>
+
+      {% if req.status == "rejected" %}
+        <div style="font-size:.8125rem; color:#991b1b;">
+          Rejected{% if req.faculty_remarks %}: {{ req.faculty_remarks }}{% endif %}
+        </div>
+
+      {% elif req.status == "pending" %}
+        <div style="font-size:.8125rem; color:#64748b;">Waiting for faculty approval.</div>
+
+      {% elif req.status == "approved" and not req.confirmed %}
+        <div class="alert alert-warning" style="font-size:.8125rem; margin-bottom:.75rem;">
+          Please confirm that you have registered on NPTEL with the same name as on your matriculation certificate.
+        </div>
+        <form method="post" action="/student/confirm-registration/{{ req.id }}">
+          <label style="display:flex; align-items:flex-start; gap:.5rem; font-size:.8125rem; cursor:pointer; margin-bottom:.75rem;">
+            <input type="checkbox" required style="margin-top:2px;"/>
+            I confirm my NPTEL registration matches my official name.
+          </label>
+          <button type="submit" class="btn btn-primary btn-sm">Confirm & Proceed</button>
+        </form>
+
+      {% elif req.status == "approved" and req.confirmed and not cert %}
+        <div style="font-size:.8125rem; color:#166534; margin-bottom:.75rem;">
+          ✅ Confirmed. Upload your certificate after completing the course.
+        </div>
+        <form method="post" action="/student/upload-certificate/{{ req.id }}" enctype="multipart/form-data">
+          <div class="form-group" style="margin-bottom:.5rem;">
+            <input type="file" name="file" accept=".pdf" required/>
+            <small style="color:#64748b; font-size:.75rem;">Original PDF from NPTEL only.</small>
+          </div>
+          <button type="submit" class="btn btn-primary btn-sm">Upload & Verify</button>
+        </form>
+
+      {% elif cert %}
+        {% if cert.certificate_status == "VERIFIED" and cert.credit_transfer_status == "ELIGIBLE" %}
+          <div style="font-size:.8125rem; color:#166534; margin-bottom:.5rem;">
+            ✅ Verified — <strong>{{ cert.credits }} credit(s)</strong>
+            {% if cert.credits_processed %}
+              &nbsp;<span class="badge badge-approved">Processed</span>
+            {% else %}
+              &nbsp;<span class="badge badge-pending">Awaiting Admin</span>
+            {% endif %}
+          </div>
+        {% else %}
+          <div style="font-size:.8125rem; color:#991b1b;">
+            ❌ {{ cert.rejection_reason or "Verification failed." }}
+          </div>
+        {% endif %}
+        <div style="font-size:.75rem; color:#94a3b8; margin-top:.4rem;">ID: {{ cert.certificate_id }}</div>
+      {% endif %}
+
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

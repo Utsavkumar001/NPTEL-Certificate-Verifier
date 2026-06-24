@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block title %}Faculty Dashboard{% endblock %}
+{% block logout_url %}/faculty/logout{% endblock %}
+
+{% block body %}
+<div class="container">
+
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem;">
+    <div>
+      <div class="page-title" style="margin-bottom:.25rem;">{{ faculty.department }}</div>
+      <div style="font-size:.875rem; color:#64748b;">{{ faculty.school }}</div>
+    </div>
+    <form method="post" action="/faculty/toggle-requests" id="toggle-form">
+      {% if faculty.requests_open %}
+        <button type="button" class="btn btn-danger"
+          onclick="confirmToggle('Are you sure you want to close course requests? Students will not be able to submit new requests.')">
+          🔒 Close Course Requests
+        </button>
+      {% else %}
+        <button type="button" class="btn btn-success"
+          onclick="confirmToggle('Are you sure you want to open course requests for your department?')">
+          🔓 Open Course Requests
+        </button>
+      {% endif %}
+    </form>
+  </div>
+
+  {% if success %}<div class="alert alert-success">{{ success }}</div>{% endif %}
+  {% if error   %}<div class="alert alert-error">{{ error }}</div>{% endif %}
+
+  {% if faculty.requests_open %}
+    <div class="alert alert-success" style="margin-bottom:1rem;">Course requests are currently <strong>open</strong> for your department.</div>
+  {% else %}
+    <div class="alert alert-info" style="margin-bottom:1rem;">Course requests are currently <strong>closed</strong> for your department.</div>
+  {% endif %}
+
+  <div class="card" style="padding:1rem;">
+    <form method="get" action="/faculty/dashboard" style="display:flex; gap:.75rem; align-items:flex-end;">
+      <div class="form-group" style="margin:0;">
+        <label>Filter by Semester</label>
+        <select name="semester" onchange="this.form.submit()" style="min-width:160px;">
+          <option value="">All Semesters</option>
+          {% for s in semesters %}
+            <option value="{{ s }}" {% if filter_sem == s %}selected{% endif %}>Semester {{ s }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% if filter_sem %}
+        <a href="/faculty/dashboard" class="btn btn-outline btn-sm" style="align-self:flex-end;">Clear</a>
+      {% endif %}
+    </form>
+  </div>
+
+  <div class="card" style="padding:0;">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Student</th><th>Roll</th><th>Class / Sem</th>
+            <th>Course</th><th>Course ID</th><th>Status</th>
+            <th>Confirmed</th><th>Certificate</th><th>Credits</th><th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in students %}
+          <tr>
+            <td>{{ s.name }}</td>
+            <td>{{ s.roll }}</td>
+            <td>{{ s["class"] }} / Sem {{ s.semester }}</td>
+            <td>{{ s.course_name or "—" }}</td>
+            <td>{{ s.nptel_course_id or "—" }}</td>
+            <td>
+              {% if s.req_status == "pending" %}<span class="badge badge-pending">Pending</span>
+              {% elif s.req_status == "approved" %}<span class="badge badge-approved">Approved</span>
+              {% elif s.req_status == "rejected" %}<span class="badge badge-rejected">Rejected</span>
+              {% else %}<span class="badge badge-none">—</span>{% endif %}
+            </td>
+            <td>{% if s.confirmed %}<span class="badge badge-approved">Yes</span>{% else %}<span class="badge badge-none">No</span>{% endif %}</td>
+            <td>
+              {% if s.certificate_status == "VERIFIED" %}<span class="badge badge-verified">Verified</span>
+              {% elif s.certificate_status == "REJECTED" %}<span class="badge badge-rejected">Rejected</span>
+              {% else %}<span class="badge badge-none">—</span>{% endif %}
+            </td>
+            <td>
+              {% if s.credit_transfer_status == "ELIGIBLE" %}<span class="badge badge-eligible">{{ s.credits }} cr</span>
+              {% else %}—{% endif %}
+            </td>
+            <td>
+              {% if s.req_status == "pending" and s.req_id %}
+              <div style="display:flex; gap:.4rem;">
+                <form method="post" action="/faculty/approve/{{ s.req_id }}">
+                  <button class="btn btn-success btn-sm">Approve</button>
+                </form>
+                <button class="btn btn-danger btn-sm" onclick="openReject({{ s.req_id }})">Reject</button>
+              </div>
+              {% elif s.certificate_status == "REJECTED" and s.cert_id %}
+              <form method="post" action="/faculty/allow-reupload/{{ s.req_id }}">
+                <button class="btn btn-outline btn-sm"
+                  onclick="return confirm('Allow this student to re-upload certificate for this course?')">
+                  Allow Re-upload
+                </button>
+              </form>
+              {% else %}—{% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="10" style="text-align:center;color:#94a3b8;padding:2rem;">No students found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="reject-modal">
+  <div class="modal">
+    <h2>Reject Course Request</h2>
+    <form method="post" id="reject-form">
+      <div class="form-group">
+        <label>Reason (optional)</label>
+        <textarea name="remarks" rows="3" placeholder="e.g. Course not relevant to department..."></textarea>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeReject()">Cancel</button>
+        <button type="submit" class="btn btn-danger">Reject</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openReject(reqId) {
+  document.getElementById("reject-form").action = "/faculty/reject/" + reqId;
+  document.getElementById("reject-modal").classList.add("open");
+}
+function closeReject() {
+  document.getElementById("reject-modal").classList.remove("open");
+}
+function confirmToggle(msg) {
+  if (confirm(msg)) {
+    document.getElementById("toggle-form").submit();
+  }
+}
+</script>
+{% endblock %}

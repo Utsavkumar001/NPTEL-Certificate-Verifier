@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Student Registration{% endblock %}
+{% block logout_url %}/student/logout{% endblock %}
+
+{% block body %}
+<div class="auth-wrap" style="align-items: flex-start; padding-top: 2.5rem;">
+  <div class="auth-card" style="max-width: 560px;">
+    <h1>Student Registration</h1>
+
+    {% if error %}
+      <div class="alert alert-error">{{ error }}</div>
+    {% endif %}
+
+    <form method="post" action="/student/register">
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Full Name</label>
+          <input type="text" name="name" required placeholder="As on official documents"/>
+        </div>
+        <div class="form-group">
+          <label>Roll Number</label>
+          <input type="text" name="roll" required placeholder="e.g. 22CSE001"/>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Class / Programme</label>
+          <input type="text" name="cls" required placeholder="e.g. B.Tech CSE"/>
+        </div>
+        <div class="form-group">
+          <label>Semester</label>
+          <select name="semester" required>
+            <option value="">Select Semester</option>
+            {% for s in semesters %}
+              <option value="{{ s }}">Semester {{ s }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>School</label>
+          <select name="school" id="school-select" required onchange="updateDepts()">
+            <option value="">Select School</option>
+            {% for school in schools %}
+              <option value="{{ school }}">{{ school }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Department</label>
+          <select name="department" id="dept-select" required>
+            <option value="">Select Department</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" name="password" required minlength="6"/>
+      </div>
+
+      <button type="submit" class="btn btn-primary" style="width:100%; margin-top:.5rem;">
+        Register
+      </button>
+
+      <p style="text-align:center; font-size:.8125rem; color:#64748b; margin-top:1rem;">
+        Already registered? <a href="/student/login">Login</a>
+      </p>
+    </form>
+
+    <div class="flash-notice">
+      ⚠️ Make sure you register with the <strong>same name as on your matriculation certificate</strong> and also register on NPTEL with the same name.
+    </div>
+  </div>
+</div>
+
+<script>
+const DEPTS = {{ schools | tojson }};
+function updateDepts() {
+  const school = document.getElementById("school-select").value;
+  const deptSel = document.getElementById("dept-select");
+  deptSel.innerHTML = '<option value="">Select Department</option>';
+  if (school && DEPTS[school]) {
+    DEPTS[school].forEach(d => {
+      const opt = document.createElement("option");
+      opt.value = d; opt.textContent = d;
+      deptSel.appendChild(opt);
+    });
+  }
+}
+</script>
+{% endblock %}

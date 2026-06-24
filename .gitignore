@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+*.db
+.env
+data/nptel.db
+data/used_certificates.json

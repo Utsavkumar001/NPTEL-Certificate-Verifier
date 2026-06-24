@@ -1,0 +1,15 @@
+fastapi
+uvicorn[standard]
+pdfplumber
+pypdf
+pyzbar
+Pillow
+openpyxl
+requests
+python-multipart
+PyMuPDF
+passlib[bcrypt]
+bcrypt==4.0.1
+jinja2
+itsdangerous
+python-dotenv

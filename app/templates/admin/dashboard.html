@@ -1,0 +1,286 @@
+{% extends "base.html" %}
+{% block title %}Admin Dashboard{% endblock %}
+{% block logout_url %}/admin/logout{% endblock %}
+
+{% block body %}
+<div class="container">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem;">
+    <div class="page-title" style="margin-bottom:0;">All Students</div>
+    <button class="btn btn-primary btn-sm" onclick="openFacultyModal()">+ Create Faculty Account</button>
+  </div>
+
+  {% if success %}<div class="alert alert-success">{{ success }}</div>{% endif %}
+  {% if error   %}<div class="alert alert-error">{{ error }}</div>{% endif %}
+
+  <!-- Filters -->
+  <div class="card">
+    <form method="get" action="/admin/dashboard" class="filter-bar">
+      <div class="form-group">
+        <label>School</label>
+        <select name="school" id="f-school" onchange="updateFDepts(); this.form.submit()">
+          <option value="">All Schools</option>
+          {% for school in schools %}
+            <option value="{{ school }}" {% if filter_school == school %}selected{% endif %}>{{ school }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Department</label>
+        <select name="department" id="f-dept" onchange="this.form.submit()">
+          <option value="">All Departments</option>
+          {% if filter_school and schools[filter_school] %}
+            {% for d in schools[filter_school] %}
+              <option value="{{ d }}" {% if filter_dept == d %}selected{% endif %}>{{ d }}</option>
+            {% endfor %}
+          {% endif %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Semester</label>
+        <select name="semester" onchange="this.form.submit()">
+          <option value="">All Semesters</option>
+          {% for s in semesters %}
+            <option value="{{ s }}" {% if filter_sem == s %}selected{% endif %}>Sem {{ s }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <button type="submit" class="btn btn-outline btn-sm" style="align-self:flex-end;">Filter</button>
+        <a href="/admin/dashboard" class="btn btn-outline btn-sm" style="align-self:flex-end; margin-left:.4rem;">Clear</a>
+      </div>
+    </form>
+  </div>
+
+  <!-- Students Table -->
+  <div class="card" style="padding:0;">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Roll</th>
+            <th>School</th>
+            <th>Dept</th>
+            <th>Class</th>
+            <th>Sem</th>
+            <th>Course</th>
+            <th>Request</th>
+            <th>Confirmed</th>
+            <th>Certificate</th>
+            <th>Credits</th>
+            <th>Processed</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in students %}
+          <tr>
+            <td>{{ s.name }}</td>
+            <td>{{ s.roll }}</td>
+            <td style="max-width:140px; white-space:normal;">{{ s.school }}</td>
+            <td>{{ s.department }}</td>
+            <td>{{ s["class"] }}</td>
+            <td>{{ s.semester }}</td>
+            <td>{{ s.course_name or "—" }}</td>
+            <td>
+              {% if s.req_status == "pending" %}
+                <span class="badge badge-pending">Pending</span>
+              {% elif s.req_status == "approved" %}
+                <span class="badge badge-approved">Approved</span>
+              {% elif s.req_status == "rejected" %}
+                <span class="badge badge-rejected">Rejected</span>
+              {% else %}<span class="badge badge-none">—</span>{% endif %}
+            </td>
+            <td>
+              {% if s.confirmed %}<span class="badge badge-approved">Yes</span>
+              {% else %}<span class="badge badge-none">No</span>{% endif %}
+            </td>
+            <td>
+              {% if s.certificate_status == "VERIFIED" %}
+                <span class="badge badge-verified">Verified</span>
+              {% elif s.certificate_status == "REJECTED" %}
+                <span class="badge badge-rejected">Rejected</span>
+              {% else %}<span class="badge badge-none">—</span>{% endif %}
+            </td>
+            <td>
+              {% if s.credit_transfer_status == "ELIGIBLE" %}
+                <span class="badge badge-eligible">{{ s.credits }} cr</span>
+              {% else %}—{% endif %}
+            </td>
+            <td>
+              {% if s.credit_transfer_status == "ELIGIBLE" %}
+                {% if s.credits_processed %}
+                  <span class="badge badge-approved">Done</span>
+                {% else %}
+                  <form method="post" action="/admin/mark-processed/{{ s.cert_id }}">
+                    <button class="btn btn-success btn-sm">Mark Done</button>
+                  </form>
+                {% endif %}
+              {% else %}—{% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="12" style="text-align:center; color:#94a3b8; padding:2rem;">No students found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Faculty List -->
+  <div class="card">
+    <div class="card-title">Faculty Accounts</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Name</th><th>Emp ID</th><th>School</th><th>Department</th><th>Created</th><th>Action</th></tr>
+        </thead>
+        <tbody>
+          {% for f in faculty_list %}
+          <tr>
+            <td>{{ f.name }}</td>
+            <td>{{ f.emp_id }}</td>
+            <td>{{ f.school }}</td>
+            <td>{{ f.department }}</td>
+            <td>{{ f.created_at[:10] }}</td>
+            <td>
+              <button class="btn btn-danger btn-sm"
+                onclick="confirmDeleteFaculty({{ f.id }}, '{{ f.name }}')">
+                Remove
+              </button>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5" style="text-align:center; color:#94a3b8; padding:1.5rem;">No faculty accounts yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Password Reset -->
+<div class="card">
+  <div class="card-title">Reset User Password</div>
+  <form method="post" action="/admin/reset-password" style="display:flex; gap:.75rem; flex-wrap:wrap; align-items:flex-end;">
+    <div class="form-group" style="margin:0;">
+      <label>User Type</label>
+      <select name="user_type" style="min-width:130px;">
+        <option value="student">Student</option>
+        <option value="faculty">Faculty</option>
+      </select>
+    </div>
+    <div class="form-group" style="margin:0;">
+      <label>Roll No / Employee ID</label>
+      <input type="text" name="identifier" required placeholder="Enter identifier" style="min-width:200px;"/>
+    </div>
+    <div class="form-group" style="margin:0;">
+      <label>New Password</label>
+      <input type="password" name="new_password" required minlength="6" style="min-width:180px;"/>
+    </div>
+    <button type="submit" class="btn btn-primary btn-sm" style="align-self:flex-end;"
+      onclick="return confirm('Are you sure you want to reset this user\'s password?')">
+      Reset Password
+    </button>
+  </form>
+</div>
+
+<!-- Admin Change Own Password -->
+  <div class="card">
+    <div class="card-title">Change Your Password</div>
+    <form method="post" action="/admin/change-own-password"
+      style="display:flex; gap:.75rem; flex-wrap:wrap; align-items:flex-end;">
+      <div class="form-group" style="margin:0;">
+        <label>Current Password</label>
+        <input type="password" name="current_password" required style="min-width:180px;"/>
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label>New Password</label>
+        <input type="password" name="new_password" required minlength="6" style="min-width:180px;"/>
+      </div>
+      <button type="submit" class="btn btn-primary btn-sm" style="align-self:flex-end;"
+        onclick="return confirm('Are you sure you want to change your password?')">
+        Change Password
+      </button>
+    </form>
+  </div>
+
+<!-- Create Faculty Modal -->
+<div class="modal-overlay" id="faculty-modal">
+  <div class="modal">
+    <h2>Create Faculty Account</h2>
+    <form method="post" action="/admin/create-faculty">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Full Name</label>
+          <input type="text" name="name" required/>
+        </div>
+        <div class="form-group">
+          <label>Employee ID</label>
+          <input type="text" name="emp_id" required/>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>School</label>
+          <select name="school" id="m-school" required onchange="updateModalDepts()">
+            <option value="">Select School</option>
+            {% for school in schools %}
+              <option value="{{ school }}">{{ school }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Department</label>
+          <select name="department" id="m-dept" required>
+            <option value="">Select Department</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" name="password" required minlength="6"/>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeFacultyModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Create</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+const DEPTS = {{ schools | tojson }};
+
+function openFacultyModal()  { document.getElementById("faculty-modal").classList.add("open"); }
+function closeFacultyModal() { document.getElementById("faculty-modal").classList.remove("open"); }
+
+function updateModalDepts() {
+  const school = document.getElementById("m-school").value;
+  const sel = document.getElementById("m-dept");
+  sel.innerHTML = '<option value="">Select Department</option>';
+  (DEPTS[school] || []).forEach(d => {
+    const o = document.createElement("option"); o.value = d; o.textContent = d; sel.appendChild(o);
+  });
+}
+
+function updateFDepts() {
+  const school = document.getElementById("f-school").value;
+  const sel = document.getElementById("f-dept");
+  sel.innerHTML = '<option value="">All Departments</option>';
+  (DEPTS[school] || []).forEach(d => {
+    const o = document.createElement("option"); o.value = d; o.textContent = d; sel.appendChild(o);
+  });
+}
+
+function confirmDeleteFaculty(id, name) {
+  if (confirm('Are you sure you want to remove faculty account of ' + name + '? This cannot be undone.')) {
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/admin/delete-faculty/' + id;
+    document.body.appendChild(form);
+    form.submit();
+  }
+}
+
+</script>
+{% endblock %}
