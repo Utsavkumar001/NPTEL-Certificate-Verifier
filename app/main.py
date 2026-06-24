@@ -1,5 +1,3 @@
-from dotenv import load_dotenv
-load_dotenv()
 import os
 from pathlib import Path
 from fastapi import FastAPI, Request
@@ -7,9 +5,14 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse
 from starlette.middleware.sessions import SessionMiddleware
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from app.database import init_db
 from app.routes import student, faculty, admin
+
+BASE = Path(__file__).parent
 
 app = FastAPI(title="NPTEL Credit Transfer System")
 app.add_middleware(
@@ -17,7 +20,6 @@ app.add_middleware(
     secret_key=os.environ.get("SECRET_KEY", "nptel-pilot-secret-key-2026")
 )
 
-BASE = Path(__file__).parent
 app.mount("/static", StaticFiles(directory=str(BASE / "static")), name="static")
 templates = Jinja2Templates(directory=str(BASE / "templates"))
 
