@@ -86,7 +86,7 @@ def validate_and_extract_qr_id(qr_url: str) -> str:
     )
 
 
-def fetch_official_pdf(qr_url: str, timeout: int = 10) -> bytes:
+def fetch_official_pdf(qr_url: str, timeout: int = 30) -> bytes:
     """
     Full chain: validate QR URL -> hit verification endpoint -> scrape PDF
     link -> download PDF bytes. Raises OfficialFetchError on any failure.
