@@ -1,3 +1,4 @@
+import re
 import tempfile, os
 from fastapi import APIRouter, Request, Form, UploadFile, File
 from fastapi.responses import RedirectResponse
@@ -20,6 +21,17 @@ from app.pdf_parser import extract_certificate_data
 from app.comparator import compare_certificates, all_passed
 from app.eligibility import calculate_credits
 from app.file_validation import validate_uploaded_pdf
+
+# helper function to extract course code from certificate ID or course ID
+def _extract_course_code(s: str) -> str:
+    """
+    Extracts the course code portion from either a certificate ID or course ID.
+    NPTEL26CS33S754600060 → CS33
+    NOC26CS33             → CS33
+    """
+    import re
+    m = re.search(r'(?:NPTEL|NOC)\d{2}([A-Z]{2}\d{2,3})', (s or "").upper())
+    return m.group(1) if m else ""
 
 router = APIRouter(prefix="/student")
 templates = Jinja2Templates(directory=str(Path(__file__).parent.parent / "templates"))
@@ -213,20 +225,17 @@ async def upload_certificate(request: Request, request_id: int, file: UploadFile
                 f"your registered name '{student['name']}'."
             )
 
-        # Course name triple check — uploaded PDF, official PDF, and course request must all match
-        elif (
-            (uploaded.course_name or "").strip().lower() !=
-            (course_req["course_name"] or "").strip().lower()
-            or
-            (official.course_name or "").strip().lower() !=
-            (course_req["course_name"] or "").strip().lower()
-        ):
+        # Course code triple check:
+        # Extract course code from certificate ID (e.g. NPTEL26CS33S75... → CS33)
+        # and match against requested course ID (e.g. NOC26CS33 → CS33)
+    
+        elif _extract_course_code(official.certificate_id) != _extract_course_code(course_req["nptel_course_id"]):
             rejection_reason = (
-                f"Course name mismatch. Requested: '{course_req['course_name']}', "
-                f"Uploaded certificate: '{uploaded.course_name}', "
-                f"Official certificate: '{official.course_name}'."
+                f"Certificate course code does not match your approved course. "
+                f"Approved: '{course_req['nptel_course_id']}', "
+                f"Certificate: '{official.certificate_id}'."
             )
-
+        
         # Duplicate certificate check
         elif is_cert_used(official.certificate_id):
             rejection_reason = "This certificate has already been used for credit transfer."
