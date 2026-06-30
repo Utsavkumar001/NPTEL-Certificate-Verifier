@@ -109,7 +109,26 @@ def fetch_official_pdf(qr_url: str, timeout: int = 30) -> bytes:
     headers_with_referer = {**HEADERS, "Referer": "https://nptel.ac.in/"}
 
     try:
-        resp = requests.get(direct_url, headers=headers_with_referer, timeout=timeout, allow_redirects=True)
+        with requests.Session() as session:
+            session.headers.update(headers_with_referer)
+            wrapper_resp = session.get(direct_url, timeout=timeout, allow_redirects=True)
+
+            # Kya kiya: wrapper HTML se <iframe src="..."> nikal ke us URL ko
+            #           alag se fetch kiya
+            # Kya hoga: nptel.ac.in sirf ek iframe wrapper deta hai (2026
+            #           certificates ke liye); requests library iframe ko
+            #           khud follow nahi karti (sirf browsers karte hain),
+            #           isliye iframe src manually extract karke fetch
+            #           karna padta hai
+            if wrapper_resp.status_code == 200 and "text/html" in wrapper_resp.headers.get("Content-Type", ""):
+                iframe_match = re.search(r'<iframe[^>]+src=["\']([^"\']+)["\']', wrapper_resp.text, re.IGNORECASE)
+                if iframe_match:
+                    iframe_url = iframe_match.group(1)
+                    resp = session.get(iframe_url, timeout=timeout, allow_redirects=True)
+                else:
+                    resp = wrapper_resp
+            else:
+                resp = wrapper_resp
     except requests.RequestException as e:
         raise OfficialFetchError(
             "ERR_002", f"Could not reach NPTEL verification server: {e}"
@@ -117,6 +136,7 @@ def fetch_official_pdf(qr_url: str, timeout: int = 30) -> bytes:
 
     if resp.status_code == 200 and resp.content[:4] == b"%PDF":
         return resp.content
+    
 
     # Fallback: older archive.nptel.ac.in/noc/Ecertificate/?q= flow
     verify_url = VERIFICATION_ENDPOINT.format(qr_id=qr_id)
