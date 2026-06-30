@@ -133,7 +133,7 @@ def extract_certificate_data(pdf_path_or_bytes) -> CertificateData:
     # --- Footer: Certificate ID + Credits recommended ---
     if rows["footer"]:
         line = " ".join(w["text"] for w in rows["footer"])
-        id_match = re.search(r"\b(NPTEL|NOC)\d{2}[A-Z]{2}\d{2}S\d+\b", line)
+        id_match = re.search(r"\b(NPTEL|NOC)\d{2}[A-Z]{2,3}\d{2}S\d+\b", line)
         if id_match:
             data.certificate_id = id_match.group()
         credits_match = re.search(

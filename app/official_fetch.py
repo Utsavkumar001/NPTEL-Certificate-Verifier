@@ -88,10 +88,37 @@ def validate_and_extract_qr_id(qr_url: str) -> str:
 
 def fetch_official_pdf(qr_url: str, timeout: int = 30) -> bytes:
     """
-    Full chain: validate QR URL -> hit verification endpoint -> scrape PDF
-    link -> download PDF bytes. Raises OfficialFetchError on any failure.
+    Fetches the official certificate PDF.
+
+    Kya kiya: 2026 certificates ke liye NPTEL ka backend change ho gaya hai
+    (Google Cloud Storage pe signed URLs use karta hai, purana
+    archive.nptel.ac.in/noc/Ecertificate/?q= flow sirf 2025 aur usse purane
+    certificates ke liye kaam karta hai). nptel.ac.in/noc/E_Certificate/{id}
+    ko Referer header ke saath hit karne par requests library khud hi poori
+    redirect chain (nptel.ac.in -> archive.nptel.ac.in/certificate.php ->
+    storage.googleapis.com signed URL) follow karke seedha PDF bytes de
+    deti hai -- bina manually signed URL parse kiye.
+
+    Kya hoga: dono purane (2025) aur naye (2026) certificates ab is single
+    flow se verify ho sakenge, kyunki nptel.ac.in/noc/E_Certificate/{id}
+    dono cases mein valid entry point hai.
     """
     qr_id = validate_and_extract_qr_id(qr_url)
+
+    direct_url = f"https://nptel.ac.in/noc/E_Certificate/{qr_id}"
+    headers_with_referer = {**HEADERS, "Referer": "https://nptel.ac.in/"}
+
+    try:
+        resp = requests.get(direct_url, headers=headers_with_referer, timeout=timeout, allow_redirects=True)
+    except requests.RequestException as e:
+        raise OfficialFetchError(
+            "ERR_002", f"Could not reach NPTEL verification server: {e}"
+        )
+
+    if resp.status_code == 200 and resp.content[:4] == b"%PDF":
+        return resp.content
+
+    # Fallback: older archive.nptel.ac.in/noc/Ecertificate/?q= flow
     verify_url = VERIFICATION_ENDPOINT.format(qr_id=qr_id)
 
     try:
@@ -116,9 +143,6 @@ def fetch_official_pdf(qr_url: str, timeout: int = 30) -> bytes:
             f"response_snippet={snippet!r}",
         )
 
-    # The href is often a relative path like "../../content/noc/...pdf" --
-    # resolve it properly against the verification page's URL rather than
-    # naively prepending the domain (which breaks for "../" paths).
     pdf_url = urljoin(verify_url, pdf_link_match.group(2))
 
     try:
